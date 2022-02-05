@@ -12,7 +12,6 @@ using std::string;
 using std::to_string;
 using std::vector;
 
-
 std::vector<string> GetProcessStat(int &pid);
 
 string LinuxParser::OperatingSystem() {
@@ -130,7 +129,8 @@ std::vector<string> GetProcessStat(int &pid) {
     int startTime{21};
     for (int i = 0; i <= 21; ++i) {
       linestream >> buffer;
-      if ((i >= LinuxParser::utime && i <= LinuxParser::cstime) || i == startTime) {
+      if ((i >= LinuxParser::utime && i <= LinuxParser::cstime) ||
+          i == startTime) {
         utilization.emplace_back(buffer);
       }
     }
@@ -139,14 +139,17 @@ std::vector<string> GetProcessStat(int &pid) {
   return utilization;
 }
 
-
 long LinuxParser::ActiveJiffies(int pid) {
   auto stats = GetProcessStat(pid);
   long totalUtilization{0};
-  for (auto & stat : stats){
+  for (auto &stat : stats) {
     totalUtilization += std::stol(stat);
   }
-  return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / LinuxParser::UpTime(pid));
+  auto uptime = LinuxParser::UpTime(pid);
+  if (uptime == 0) {
+    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)));
+  } else
+    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / uptime);
 }
 
 long LinuxParser::ActiveJiffies() { return Jiffies() - IdleJiffies(); }
@@ -244,8 +247,8 @@ string LinuxParser::Uid(int pid) {
 string LinuxParser::User(int pid) {
   std::ifstream stream(kPasswordPath);
   if (stream.is_open()) {
-    string line;
     string user;
+    string line;
     string delimiter;
     string uPid;
     while (std::getline(stream, line)) {
@@ -254,6 +257,7 @@ string LinuxParser::User(int pid) {
       while (linestream >> user >> delimiter >> uPid) {
         if (uPid == to_string(pid)) {
           return user;
+          break;
         }
       }
     }
@@ -264,5 +268,5 @@ string LinuxParser::User(int pid) {
 long LinuxParser::UpTime(int pid) {
   auto utilization = GetProcessStat(pid);
   return LinuxParser::UpTime() -
-                (std::stol(utilization.back()) / sysconf(_SC_CLK_TCK));
+         (std::stol(utilization.back()) / sysconf(_SC_CLK_TCK));
 }

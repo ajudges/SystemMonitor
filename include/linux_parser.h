@@ -7,8 +7,7 @@
 
 namespace LinuxParser {
 // Paths
-// const std::string kProcDirectory{"/proc/"};
-const std::string kProcDirectory{"./blob/"};
+const std::string kProcDirectory{"/proc/"};
 const std::string kCmdlineFilename{"/cmdline"};
 const std::string kCpuinfoFilename{"/cpuinfo"};
 const std::string kStatusFilename{"/status"};
@@ -16,10 +15,8 @@ const std::string kStatFilename{"/stat"};
 const std::string kUptimeFilename{"/uptime"};
 const std::string kMeminfoFilename{"/meminfo"};
 const std::string kVersionFilename{"/version"};
-// const std::string kOSPath{"/etc/os-release"};
-const std::string kOSPath{"./blob/os-release"};
-// const std::string kPasswordPath{"/etc/passwd"};
-const std::string kPasswordPath{"./blob/passwd"};
+const std::string kOSPath{"/etc/os-release"};
+const std::string kPasswordPath{"/etc/passwd"};
 
 // System
 float MemoryUtilization();
@@ -55,12 +52,7 @@ std::string Ram(int pid);
 std::string Uid(int pid);
 std::string User(int pid);
 long int UpTime(int pid);
-enum processStates{
-      utime  = 13,
-      stime,
-      cutime,
-      cstime
-};
+enum processStates { utime = 13, stime, cutime, cstime };
 };  // namespace LinuxParser
 
 #endif
