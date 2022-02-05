@@ -12,6 +12,9 @@ using std::string;
 using std::to_string;
 using std::vector;
 
+
+std::vector<string> GetProcessStat(int &pid);
+
 string LinuxParser::OperatingSystem() {
   string line;
   string key;
@@ -114,35 +117,36 @@ long LinuxParser::Jiffies() {
   return jiffies;
 }
 
-std::vector<string> GetProcessutilization(int &pid) {
+std::vector<string> GetProcessStat(int &pid) {
   std::vector<string> utilization;
   std::ifstream stream(LinuxParser::kProcDirectory + to_string(pid) +
                        LinuxParser::kStatFilename);
-  if (stream.is_open()) {
+  bool is_finished{false};
+  while (stream.is_open() && (not is_finished)) {
     string line;
     std::getline(stream, line);
     std::istringstream linestream(line);
     string buffer;
+    int startTime{21};
     for (int i = 0; i <= 21; ++i) {
       linestream >> buffer;
-      if (i == 0 || i >= 13 && i <= 16 || i == 21) {
+      if ((i >= LinuxParser::utime && i <= LinuxParser::cstime) || i == startTime) {
         utilization.emplace_back(buffer);
       }
     }
+    is_finished = true;
   }
   return utilization;
 }
 
-// TODO: Read and return the number of active jiffies for a PID
-// REMOVE: [[maybe_unused]] once you define the function
+
 long LinuxParser::ActiveJiffies(int pid) {
-  auto pUtilization = GetProcessutilization(pid);
-  int totalUtilization =
-      std::stol(pUtilization[1]) + std::stol(pUtilization[2]) +
-      std::stol(pUtilization[3]) + std::stol(pUtilization[4]);
-  int seconds = std::stol(pUtilization[0]) -
-                (std::stol(pUtilization[5]) / sysconf(_SC_CLK_TCK));
-  return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / seconds);
+  auto stats = GetProcessStat(pid);
+  long totalUtilization{0};
+  for (auto & stat : stats){
+    totalUtilization += std::stol(stat);
+  }
+  return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / LinuxParser::UpTime(pid));
 }
 
 long LinuxParser::ActiveJiffies() { return Jiffies() - IdleJiffies(); }
@@ -201,7 +205,7 @@ int LinuxParser::TotalProcesses() {
   if (value.empty()) {
     return 0;
   }
-  return std::stol(value);
+  return std::stoi(value);
 }
 
 int LinuxParser::RunningProcesses() {
@@ -212,7 +216,7 @@ int LinuxParser::RunningProcesses() {
   if (value.empty()) {
     return 0;
   }
-  return std::stoi(value);
+  return std::stol(value);
 }
 
 string LinuxParser::Command(int pid) {
@@ -228,7 +232,7 @@ string LinuxParser::Command(int pid) {
 string LinuxParser::Ram(int pid) {
   string path = kProcDirectory + to_string(pid) + kStatusFilename;
   string key = "VmSize:";
-  return to_string(std::stoi(GetValue(path, key)) / 1000);
+  return to_string(std::stol(GetValue(path, key)) / 1000);
 }
 
 string LinuxParser::Uid(int pid) {
@@ -258,6 +262,7 @@ string LinuxParser::User(int pid) {
 }
 
 long LinuxParser::UpTime(int pid) {
-  auto utilization = GetProcessutilization(pid);
-  return std::stoi(utilization[5]) / sysconf(_SC_CLK_TCK);
+  auto utilization = GetProcessStat(pid);
+  return LinuxParser::UpTime() -
+                (std::stol(utilization.back()) / sysconf(_SC_CLK_TCK));
 }

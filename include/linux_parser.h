@@ -18,7 +18,8 @@ const std::string kMeminfoFilename{"/meminfo"};
 const std::string kVersionFilename{"/version"};
 // const std::string kOSPath{"/etc/os-release"};
 const std::string kOSPath{"./blob/os-release"};
-const std::string kPasswordPath{"/etc/passwd"};
+// const std::string kPasswordPath{"/etc/passwd"};
+const std::string kPasswordPath{"./blob/passwd"};
 
 // System
 float MemoryUtilization();
@@ -54,6 +55,12 @@ std::string Ram(int pid);
 std::string Uid(int pid);
 std::string User(int pid);
 long int UpTime(int pid);
+enum processStates{
+      utime  = 13,
+      stime,
+      cutime,
+      cstime
+};
 };  // namespace LinuxParser
 
 #endif
