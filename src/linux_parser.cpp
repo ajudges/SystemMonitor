@@ -47,7 +47,6 @@ string LinuxParser::Kernel() {
   return version;
 }
 
-// BONUS: Update this to use std::filesystem
 vector<int> LinuxParser::Pids() {
   vector<int> pids;
   DIR *directory = opendir(kProcDirectory.c_str());
@@ -234,7 +233,11 @@ string LinuxParser::Command(int pid) {
 string LinuxParser::Ram(int pid) {
   string path = kProcDirectory + to_string(pid) + kStatusFilename;
   string key = "VmSize:";
-  return to_string(std::stol(GetValue(path, key)) / 1000);
+  auto ram = GetValue(path, key);
+  if (ram.empty()){
+    return to_string(0);
+  }
+  return to_string(std::stol(ram) / 1000);
 }
 
 string LinuxParser::Uid(int pid) {
