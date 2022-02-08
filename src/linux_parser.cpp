@@ -163,7 +163,7 @@ long LinuxParser::UpTime() {
 // Read and return the total number of processes on the system
 int LinuxParser::TotalProcesses() {
   string line;
-  string path = kProcDirectory + kStatFilename;
+  string path = kStatFilename;
   string key = LinuxParser::filterProcesses;
   int value = findValueByKey<int>(key, path);
   return value;
