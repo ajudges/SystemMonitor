@@ -257,7 +257,7 @@ string LinuxParser::User(int pid) {
       std::replace(line.begin(), line.end(), ':', ' ');
       std::istringstream linestream(line);
       while (linestream >> user >> delimiter >> uPid) {
-        if (uPid == to_string(pid)) {
+        if (uPid == LinuxParser::Uid(pid)) {
           return user;
           break;
         }
