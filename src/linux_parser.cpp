@@ -16,24 +16,24 @@ using std::vector;
 // Util
 //-----------------------------------------------------------------------------
 // Helper for getting value by key
-string GetValue(string &filePath, string &key) {
-  string value;
-  std::ifstream stream(filePath);
+template <typename T>
+T findValueByKey(std::string const &keyFilter, std::string const &filename) {
+  std::string line, key;
+  T value;
+
+  std::ifstream stream(LinuxParser::kProcDirectory + filename);
   if (stream.is_open()) {
-    string line;
-    string buffer;
     while (std::getline(stream, line)) {
       std::istringstream linestream(line);
-      while (linestream >> buffer) {
-        if (buffer == key) {
-          linestream >> value;
+      while (linestream >> key >> value) {
+        if (key == keyFilter) {
           return value;
         }
       }
     }
   }
   return value;
-}
+};
 
 // Helper for getting process stats
 std::vector<string> GetProcessStat(int &pid) {
@@ -76,7 +76,7 @@ string LinuxParser::OperatingSystem() {
       std::replace(line.begin(), line.end(), '"', ' ');
       std::istringstream linestream(line);
       while (linestream >> key >> value) {
-        if (key == "PRETTY_NAME") {
+        if (key == LinuxParser::filterOSName) {
           std::replace(value.begin(), value.end(), '_', ' ');
           return value;
         }
@@ -134,11 +134,11 @@ float LinuxParser::MemoryUtilization() {
       string key;
       float value;
       while (linestream >> key >> value) {
-        if (key == "MemTotal") {
+        if (key == LinuxParser::filterMemTotal) {
           memTotal = value;
           continue;
         }
-        if (key == "MemFree") {
+        if (key == LinuxParser::filterMemFree) {
           memFree = value;
         }
       }
@@ -164,24 +164,18 @@ long LinuxParser::UpTime() {
 int LinuxParser::TotalProcesses() {
   string line;
   string path = kProcDirectory + kStatFilename;
-  string key = "processes";
-  string value = GetValue(path, key);
-  if (value.empty()) {
-    return 0;
-  }
-  return std::stoi(value);
+  string key = LinuxParser::filterProcesses;
+  int value = findValueByKey<int>(key, path);
+  return value;
 }
 
 // Read and return the running processes on the system
 int LinuxParser::RunningProcesses() {
   string line;
-  string path = kProcDirectory + kStatFilename;
-  string key = "procs_running";
-  string value = GetValue(path, key);
-  if (value.empty()) {
-    return 0;
-  }
-  return std::stol(value);
+  string path = kStatFilename;
+  string key = LinuxParser::filterProcsRunning;
+  int value = findValueByKey<int>(key, path);
+  return value;
 }
 
 //-----------------------------------------------------------------------------
@@ -218,7 +212,7 @@ vector<string> LinuxParser::CpuUtilization() {
     std::getline(stream, line);
     std::istringstream linestream(line);
     while (linestream >> key) {
-      if (key == "cpu") {
+      if (key == LinuxParser::filterCpu) {
         for (int i = kUser_; i <= kGuestNice_; ++i) {
           linestream >> value;
           utilization.emplace_back(value);
@@ -243,9 +237,9 @@ long LinuxParser::ActiveJiffies(int pid) {
   }
   auto uptime = LinuxParser::UpTime(pid);
   if (uptime == 0) {
-    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)));
+    return (totalUtilization / sysconf(_SC_CLK_TCK));
   } else
-    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / uptime);
+    return (totalUtilization / sysconf(_SC_CLK_TCK)) / uptime;
 }
 
 // Read and return the command associated with a process
@@ -261,9 +255,9 @@ string LinuxParser::Command(int pid) {
 
 // Read and return RAM utilization by a process
 string LinuxParser::Ram(int pid) {
-  string path = kProcDirectory + to_string(pid) + kStatusFilename;
-  string key = "VmSize:";
-  auto ram = GetValue(path, key);
+  string path = to_string(pid) + kStatusFilename;
+  string key = filterProcMem;
+  auto ram = findValueByKey<string>(key, path);
   if (ram.empty()){
     return to_string(0);
   }
@@ -272,9 +266,9 @@ string LinuxParser::Ram(int pid) {
 
 // Read and return the user ID associated with a process
 string LinuxParser::Uid(int pid) {
-  string path = kProcDirectory + to_string(pid) + kStatusFilename;
-  string key = "Uid:";
-  return GetValue(path, key);
+  string path = to_string(pid) + kStatusFilename;
+  string key = LinuxParser::filterUID;
+  return findValueByKey<string>(key, path);
 }
 
 // Read and return the user associated with a process
