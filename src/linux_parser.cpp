@@ -11,8 +11,59 @@ using std::string;
 using std::to_string;
 using std::vector;
 
-std::vector<string> GetProcessStat(int &pid);
 
+//-----------------------------------------------------------------------------
+// Util
+//-----------------------------------------------------------------------------
+// Helper for getting value by key
+string GetValue(string &filePath, string &key) {
+  string value;
+  std::ifstream stream(filePath);
+  if (stream.is_open()) {
+    string line;
+    string buffer;
+    while (std::getline(stream, line)) {
+      std::istringstream linestream(line);
+      while (linestream >> buffer) {
+        if (buffer == key) {
+          linestream >> value;
+          return value;
+        }
+      }
+    }
+  }
+  return value;
+}
+
+// Helper for getting process stats
+std::vector<string> GetProcessStat(int &pid) {
+  std::vector<string> utilization;
+  std::ifstream stream(LinuxParser::kProcDirectory + to_string(pid) +
+                       LinuxParser::kStatFilename);
+  bool is_finished{false};
+  while (stream.is_open() && (not is_finished)) {
+    string line;
+    std::getline(stream, line);
+    std::istringstream linestream(line);
+    string buffer;
+    int startTime{21};
+    for (int i = 0; i <= 21; ++i) {
+      linestream >> buffer;
+      if ((i >= LinuxParser::utime && i <= LinuxParser::cstime) ||
+          i == startTime) {
+        utilization.emplace_back(buffer);
+      }
+    }
+    is_finished = true;
+  }
+  return utilization;
+}
+
+//-----------------------------------------------------------------------------
+// System
+//-----------------------------------------------------------------------------
+
+// Read and return OS name
 string LinuxParser::OperatingSystem() {
   string line;
   string key;
@@ -35,6 +86,7 @@ string LinuxParser::OperatingSystem() {
   return value;
 }
 
+// Read and return Linux Kernel version
 string LinuxParser::Kernel() {
   string os, kernel, version;
   string line;
@@ -47,6 +99,7 @@ string LinuxParser::Kernel() {
   return version;
 }
 
+// Read and return the id of processes on the system
 vector<int> LinuxParser::Pids() {
   vector<int> pids;
   DIR *directory = opendir(kProcDirectory.c_str());
@@ -66,6 +119,7 @@ vector<int> LinuxParser::Pids() {
   return pids;
 }
 
+// Read and return system memory utilization
 float LinuxParser::MemoryUtilization() {
   float memTotal{0.};
   float memFree{0.};
@@ -93,6 +147,7 @@ float LinuxParser::MemoryUtilization() {
   return (memTotal - memFree) / memTotal;
 }
 
+// Read and return uptime of processes
 long LinuxParser::UpTime() {
   long uptime{0};
   string line;
@@ -105,6 +160,35 @@ long LinuxParser::UpTime() {
   return uptime;
 }
 
+// Read and return the total number of processes on the system
+int LinuxParser::TotalProcesses() {
+  string line;
+  string path = kProcDirectory + kStatFilename;
+  string key = "processes";
+  string value = GetValue(path, key);
+  if (value.empty()) {
+    return 0;
+  }
+  return std::stoi(value);
+}
+
+// Read and return the running processes on the system
+int LinuxParser::RunningProcesses() {
+  string line;
+  string path = kProcDirectory + kStatFilename;
+  string key = "procs_running";
+  string value = GetValue(path, key);
+  if (value.empty()) {
+    return 0;
+  }
+  return std::stol(value);
+}
+
+//-----------------------------------------------------------------------------
+// Processor
+//-----------------------------------------------------------------------------
+
+// Read and return the number of jiffies for the system
 long LinuxParser::Jiffies() {
   std::vector<string> utilization = CpuUtilization();
   long jiffies{0};
@@ -114,49 +198,16 @@ long LinuxParser::Jiffies() {
   return jiffies;
 }
 
-std::vector<string> GetProcessStat(int &pid) {
-  std::vector<string> utilization;
-  std::ifstream stream(LinuxParser::kProcDirectory + to_string(pid) +
-                       LinuxParser::kStatFilename);
-  bool is_finished{false};
-  while (stream.is_open() && (not is_finished)) {
-    string line;
-    std::getline(stream, line);
-    std::istringstream linestream(line);
-    string buffer;
-    int startTime{21};
-    for (int i = 0; i <= 21; ++i) {
-      linestream >> buffer;
-      if ((i >= LinuxParser::utime && i <= LinuxParser::cstime) ||
-          i == startTime) {
-        utilization.emplace_back(buffer);
-      }
-    }
-    is_finished = true;
-  }
-  return utilization;
-}
-
-long LinuxParser::ActiveJiffies(int pid) {
-  auto stats = GetProcessStat(pid);
-  long totalUtilization{0};
-  for (auto &stat : stats) {
-    totalUtilization += std::stol(stat);
-  }
-  auto uptime = LinuxParser::UpTime(pid);
-  if (uptime == 0) {
-    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)));
-  } else
-    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / uptime);
-}
-
+// Read and return the number of active jiffies for the system
 long LinuxParser::ActiveJiffies() { return Jiffies() - IdleJiffies(); }
 
+// Read and return the number of idle jiffies for the system
 long LinuxParser::IdleJiffies() {
   std::vector<string> utilization = CpuUtilization();
   return std::stol(utilization[kIdle_]) + std::stol(utilization[kIOwait_]);
 }
 
+// Read and return CPU utilization
 vector<string> LinuxParser::CpuUtilization() {
   std::vector<string> utilization;
   string line;
@@ -179,47 +230,25 @@ vector<string> LinuxParser::CpuUtilization() {
   return utilization;
 }
 
-string GetValue(string &filePath, string &key) {
-  string value;
-  std::ifstream stream(filePath);
-  if (stream.is_open()) {
-    string line;
-    string buffer;
-    while (std::getline(stream, line)) {
-      std::istringstream linestream(line);
-      while (linestream >> buffer) {
-        if (buffer == key) {
-          linestream >> value;
-          return value;
-        }
-      }
-    }
+//-----------------------------------------------------------------------------
+// Process
+//-----------------------------------------------------------------------------
+
+// Read and return the number of active jiffies for a process
+long LinuxParser::ActiveJiffies(int pid) {
+  auto stats = GetProcessStat(pid);
+  long totalUtilization{0};
+  for (auto &stat : stats) {
+    totalUtilization += std::stol(stat);
   }
-  return value;
+  auto uptime = LinuxParser::UpTime(pid);
+  if (uptime == 0) {
+    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)));
+  } else
+    return 100 * ((totalUtilization / sysconf(_SC_CLK_TCK)) / uptime);
 }
 
-int LinuxParser::TotalProcesses() {
-  string line;
-  string path = kProcDirectory + kStatFilename;
-  string key = "processes";
-  string value = GetValue(path, key);
-  if (value.empty()) {
-    return 0;
-  }
-  return std::stoi(value);
-}
-
-int LinuxParser::RunningProcesses() {
-  string line;
-  string path = kProcDirectory + kStatFilename;
-  string key = "procs_running";
-  string value = GetValue(path, key);
-  if (value.empty()) {
-    return 0;
-  }
-  return std::stol(value);
-}
-
+// Read and return the command associated with a process
 string LinuxParser::Command(int pid) {
   string path = kProcDirectory + std::to_string(pid) + kCmdlineFilename;
   std::ifstream stream(path);
@@ -230,6 +259,7 @@ string LinuxParser::Command(int pid) {
   return line;
 }
 
+// Read and return RAM utilization by a process
 string LinuxParser::Ram(int pid) {
   string path = kProcDirectory + to_string(pid) + kStatusFilename;
   string key = "VmSize:";
@@ -240,12 +270,14 @@ string LinuxParser::Ram(int pid) {
   return to_string(std::stol(ram) / 1000);
 }
 
+// Read and return the user ID associated with a process
 string LinuxParser::Uid(int pid) {
   string path = kProcDirectory + to_string(pid) + kStatusFilename;
   string key = "Uid:";
   return GetValue(path, key);
 }
 
+// Read and return the user associated with a process
 string LinuxParser::User(int pid) {
   std::ifstream stream(kPasswordPath);
   if (stream.is_open()) {
@@ -267,6 +299,7 @@ string LinuxParser::User(int pid) {
   return string();
 }
 
+// Read and return the uptime of a process
 long LinuxParser::UpTime(int pid) {
   auto utilization = GetProcessStat(pid);
   return LinuxParser::UpTime() -
