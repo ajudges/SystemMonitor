@@ -24,7 +24,7 @@ const std::string filterMemFree("MemFree");
 const std::string filterProcesses("processes");
 const std::string filterProcsRunning("procs_running");
 const std::string filterCpu("cpu");
-const std::string filterProcMem("VmSize:"); // using VmRSS because it reports exact physical mem (http://man7.org/linux/man-pages/man5/proc.5.html)
+const std::string filterProcMem("VmRSS:"); // using VmRSS because it reports exact physical mem (http://man7.org/linux/man-pages/man5/proc.5.html)
 const std::string filterUID("Uid:");
 
 // System
